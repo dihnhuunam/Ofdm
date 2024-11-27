@@ -3,11 +3,22 @@ import matplotlib.pyplot as plt
 from scipy.fft import fft, ifft
 from scipy.signal import convolve
 
-# Các hàm trước đó vẫn giữ nguyên, bao gồm ofdm_modulator, ofdm_demodulator, qam_modulator, qam_demodulator, symerr, awgn
-
+# Channel Model Functions
 def mcm_channel_model(u, initial_time, number_of_summations, symbol_duration, f_dmax, channel_coefficients):
     """
-    Monte Carlo Multipath (MCM) channel model.
+    Implements Monte Carlo Multipath (MCM) channel model simulation.
+    
+    Parameters:
+    - u: Random variables for channel realization
+    - initial_time: Starting time of the symbol
+    - number_of_summations: Number of summation terms for channel modeling
+    - symbol_duration: Duration of each symbol
+    - f_dmax: Maximum Doppler frequency
+    - channel_coefficients: Predefined channel tap gains
+    
+    Returns:
+    - h: Channel impulse response
+    - t_next: Next time step
     """
     t = initial_time
     Channel_Length = len(channel_coefficients)
@@ -17,6 +28,7 @@ def mcm_channel_model(u, initial_time, number_of_summations, symbol_duration, f_
         u_k = u[k, :]
         phi = 2 * np.pi * u_k
         f_d = f_dmax * np.sin(2 * np.pi * u_k)
+        # Calculate channel tap using stochastic model
         h_tem = channel_coefficients[k] * 1 / np.sqrt(number_of_summations) * np.sum(np.exp(1j * phi) * np.exp(1j * 2 * np.pi * f_d * t))
         h_vector.append(h_tem)
 
@@ -26,77 +38,85 @@ def mcm_channel_model(u, initial_time, number_of_summations, symbol_duration, f_
 
 def ofdm_modulator(data, NFFT, G):
     """
-    Modulates data into an OFDM signal.
-
+    Modulates input data into an OFDM signal.
+    
     Parameters:
     - data: Input data symbols
-    - NFFT: FFT size
+    - NFFT: Fast Fourier Transform size
     - G: Guard interval size
-
+    
     Returns:
-    - OFDM modulated signal
+    - OFDM modulated time-domain signal
     """
     chnr = len(data)
+    # Zero-pad the data to NFFT size
     x = np.concatenate([data, np.zeros(NFFT - chnr)])
+    # Convert to time domain using IFFT
     a = ifft(x)
+    # Add cyclic prefix (guard interval)
     y = np.concatenate([a[-G:], a])
     return y
 
 def ofdm_demodulator(data, chnr, NFFT, G):
     """
-    Demodulates an OFDM signal back to data symbols.
-
+    Demodulates OFDM signal back to data symbols.
+    
     Parameters:
     - data: OFDM modulated signal
     - chnr: Number of data symbols
     - NFFT: FFT size
     - G: Guard interval size
-
+    
     Returns:
-    - Demodulated data symbols
+    - Demodulated data symbols in frequency domain
     """
+    # Remove guard interval
     x_remove_guard_interval = data[G:NFFT + G]
+    # Convert back to frequency domain
     x = fft(x_remove_guard_interval)
+    # Extract original data symbols
     y = x[:chnr]
     return y
 
 def qam_modulator(data, M):
     """
-    Modulates data symbols using QAM.
-
+    Modulates data symbols using Quadrature Amplitude Modulation (QAM).
+    
     Parameters:
     - data: Input data symbols
-    - M: QAM modulation order
-
+    - M: QAM modulation order (constellation size)
+    
     Returns:
-    - QAM modulated symbols
+    - QAM modulated complex symbols
     """
     return np.sqrt(1 / 10) * np.exp(1j * (np.pi / M) * (2 * data + 1))
 
 def qam_demodulator(symbols, M):
     """
-    Demodulates QAM symbols back to data symbols.
-
+    Demodulates QAM symbols back to original data symbols.
+    
     Parameters:
-    - symbols: QAM modulated symbols
+    - symbols: QAM modulated complex symbols
     - M: QAM modulation order
-
+    
     Returns:
-    - Demodulated data symbols
+    - Demodulated integer data symbols
     """
+    # Decode symbols using angle and QAM constellation mapping
     demod_data = (np.angle(symbols) / (np.pi / M) - 1) / 2
     return np.round(demod_data).astype(int) % M
 
 def symerr(a, b):
     """
     Calculates symbol error rate (SER) and number of errors.
-
+    
     Parameters:
     - a: Original data symbols
     - b: Decoded data symbols
-
+    
     Returns:
-    - Number of errors, Symbol error rate (SER)
+    - Number of symbol errors
+    - Symbol error rate
     """
     num_errors = np.sum(a != b)
     error_rate = num_errors / len(a)
@@ -105,19 +125,26 @@ def symerr(a, b):
 def awgn(s, snr_dB):
     """
     Adds Additive White Gaussian Noise (AWGN) to the signal.
-
+    
     Parameters:
     - s: Input signal
-    - snr_dB: Signal-to-Noise Ratio (SNR) in dB
-
+    - snr_dB: Signal-to-Noise Ratio in decibels
+    
     Returns:
-    - Signal with AWGN added
+    - Noisy signal with AWGN added
     """
+    # Convert SNR from dB to linear scale
     snr_linear = 10**(snr_dB / 10)
+    # Calculate signal power
     power_signal = np.mean(np.abs(s)**2)
+    # Calculate noise variance
     noise_variance = power_signal / snr_linear
+    # Generate complex Gaussian noise
     noise = np.sqrt(noise_variance / 2) * (np.random.randn(*s.shape) + 1j * np.random.randn(*s.shape))
     return s + noise
+
+# Rest of the code remains the same as in the original script
+# ... [The rest of the implementation follows]
 
 
 # Parameters for OFDM system and Monte Carlo channel model
@@ -156,7 +183,7 @@ for number_of_realization in range(Number_Relz):
     snr_max = 25
     step = 1
     snr_range = np.arange(snr_min, snr_max + 1, step)
-
+    print(number_of_realization)
     for snr in snr_range:
         snt = snr - 10 * np.log10((NFFT + G) / NFFT)  # Effective SNR
         rs_frame = []
@@ -233,6 +260,7 @@ plt.ylabel("Quadrature")
 plt.grid(True)
 plt.legend()
 plt.axis('equal')
+plt.savefig('step1_qam_modulation.png')
 plt.show()
 
 # Step 2: OFDM Modulation
@@ -246,6 +274,7 @@ plt.xlabel("Sample Index")
 plt.ylabel("Amplitude")
 plt.legend()
 plt.grid(True)
+plt.savefig('step2_ofdm_modulation.png')
 plt.show()
 
 # Step 3: Transmit through Fading Channel
@@ -259,6 +288,7 @@ plt.xlabel("Tap Index")
 plt.ylabel("Magnitude")
 plt.grid(True)
 plt.legend()
+plt.savefig('step3_fading_channel.png')
 plt.show()
 
 # Step 4: Add AWGN Noise
@@ -276,6 +306,7 @@ plt.xlabel("Sample Index")
 plt.ylabel("Amplitude")
 plt.legend()
 plt.grid(True)
+plt.savefig('step4_awgn_noise.png')
 plt.show()
 
 # Step 5: MMSE Equalization
@@ -292,4 +323,5 @@ plt.ylabel("Quadrature")
 plt.grid(True)
 plt.legend()
 plt.axis('equal')
+plt.savefig('step5_mmse_equalization.png')
 plt.show()
