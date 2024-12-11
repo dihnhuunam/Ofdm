@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial import distance
 from scipy.signal import convolve
-from skimage.io import imread
+from skimage.io import imread, imsave
 from skimage.color import rgb2gray
 from skimage.util import img_as_ubyte
 
@@ -109,6 +109,27 @@ ber = bit_errors / len(im_bin)
 
 # Recover image
 rec_im = np.array([int(rec_bin[i:i+8], 2) for i in range(0, len(rec_bin), 8)], dtype=np.uint8).reshape(im.shape)
+
+# Save recovered image
+imsave('recovered_image.jpg', rec_im)
+
+# Plot results
+plt.figure(figsize=(10, 10))
+plt.subplot(2, 2, 1)
+plt.scatter(X.real, X.imag, s=10, label="Transmit Constellation")
+plt.title(f"Transmit Constellation ({mod_method})")
+plt.xlabel("In-Phase")
+plt.ylabel("Quadrature")
+plt.grid()
+
+plt.tight_layout()
+plt.savefig('constellation_plots.png')
+
+# Save performance metrics
+with open('performance_metrics.txt', 'w') as f:
+    f.write(f"BER: {ber:.6f}\n")
+    f.write(f"SNR: {snr:.2f} dB\n")
+    f.write(f"Symbol Error Rate: {bit_errors/len(symbols):.6f}\n")
 
 # Plot results
 plt.figure(figsize=(10, 10))
