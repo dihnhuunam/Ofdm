@@ -17,7 +17,7 @@ mod_methods = ['BPSK', 'QPSK', '8PSK', '16QAM', '32QAM', '64QAM']
 mod_order = mod_methods.index(mod_method) + 1
 
 # Đọc và xử lý ảnh đầu vào
-im = imread('./images/logo.png')
+im = imread('./images/image.png')
 if im.shape[-1] == 4:
     im = im[:, :, :3]
 

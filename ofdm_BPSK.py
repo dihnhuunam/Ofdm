@@ -16,7 +16,7 @@ mod_order = 1  # BPSK dùng 1 bit/ký hiệu
 symbol_book = np.array([-1, 1], dtype=np.complex64)
 
 # Đọc và xử lý ảnh đầu vào
-im = imread('./images/logo.png')
+im = imread('./images/image.png')
 if im.shape[-1] == 4:
     im = im[:, :, :3]
 
