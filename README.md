@@ -4,7 +4,7 @@ Dự án này mô phỏng quá trình truyền dẫn ảnh sử dụng kỹ thu�
 
 ## Tính năng
 
-- Hỗ trợ nhiều phương pháp điều chế: BPSK, QPSK, 8PSK, 16QAM, 32QAM, 64QAM
+- Hỗ trợ nhiều phương pháp điều chế: BPSK, QPSK
 - Mô phỏng kênh fading đa đường
 - Ước lượng và cân bằng kênh sử dụng phương pháp MMSE
 - Thêm nhiễu Gaussian trắng (AWGN)
