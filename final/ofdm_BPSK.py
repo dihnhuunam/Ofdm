@@ -1,23 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.spatial import cKDTree
 from scipy.signal import convolve
 from skimage.io import imread
 
 # Parameters
-mod_method = 'QPSK'
-n_fft = 256
-n_cpe = 32
+mod_method = 'BPSK'
+n_fft = 128
+n_cpe = 16
 snr = 30  # in dB
-n_taps = 4
+n_taps = 8
 ch_est_method = 'MMSE'
 
 # Modulation configuration
-mod_methods = ['BPSK', 'QPSK', '8PSK', '16QAM', '32QAM', '64QAM']
-mod_order = mod_methods.index(mod_method) + 1
+mod_order = 1  # BPSK chỉ sử dụng 1 bit trên mỗi ký hiệu
+symbol_book = np.array([-1, 1], dtype=np.complex64)  # Sách ký hiệu BPSK
 
 # Load image
-im = imread('logo.png')
+im = imread('image2.png')
 
 if im.shape[-1] == 4:
     im = im[:, :, :3]
@@ -29,35 +28,14 @@ for i in range(3):  # Xử lý từng kênh màu
 
 im_bin = np.concatenate(im_bin)  # Gộp các kênh lại
 
-# # Padding and symbol mapping
-# sym_rem = (mod_order - len(im_bin) % mod_order) % mod_order
-# padding = np.zeros(sym_rem, dtype=np.uint8)
-# im_bin_padded = np.concatenate((im_bin, padding))
-# cons_data = im_bin_padded.reshape(-1, mod_order)
-# cons_sym_id = np.packbits(cons_data, axis=1).flatten()
-
-# Generate symbol book for QPSK
-mod_ind = 2 ** mod_order  # Số tín hiệu điều chế
-n = np.arange(0, 2 * np.pi, 2 * np.pi / mod_ind)  # Góc điều chế
-symbol_book = np.exp(1j * n)  # QPSK
-
 # Padding và ánh xạ ký hiệu
 sym_rem = (mod_order - len(im_bin) % mod_order) % mod_order
 padding = np.zeros(sym_rem, dtype=np.uint8)
 im_bin_padded = np.concatenate((im_bin, padding))
-cons_data = im_bin_padded.reshape(-1, mod_order)
-cons_sym_id = np.dot(cons_data, 1 << np.arange(cons_data.shape[1])[::-1])
-cons_sym_id = cons_sym_id % len(symbol_book)  # Đảm bảo trong phạm vi hợp lệ
 
-# Chuyển đổi từ bit nhị phân sang chỉ số ký hiệu
-cons_sym_id = np.dot(cons_data, 1 << np.arange(cons_data.shape[1])[::-1])
-cons_sym_id = cons_sym_id % len(symbol_book)  # Giới hạn chỉ số trong phạm vi hợp lệ
-
-# Kiểm tra tính hợp lệ
-assert np.all(cons_sym_id < len(symbol_book)), "cons_sym_id vẫn chứa giá trị ngoài phạm vi!"
-
-# Điều chế dữ liệu
-X = symbol_book[cons_sym_id]
+# Chuyển đổi từ bit nhị phân sang ký hiệu BPSK
+cons_sym_id = im_bin_padded  # Dữ liệu nhị phân chính là chỉ số ký hiệu trong BPSK
+X = symbol_book[cons_sym_id]  # Ánh xạ vào sách ký hiệu
 
 # OFDM block creation
 fft_rem = (n_fft - len(X) % n_fft) % n_fft
@@ -97,11 +75,8 @@ if n_taps > 1:
 X_hat = X_hat_blocks.flatten()[:len(X)]
 
 # Demodulation
-rec_syms = np.array([np.argmin(np.abs(symbol_book - sym)) for sym in X_hat])
-
-# Recover binary data
-rec_syms_cons = np.unpackbits(rec_syms.astype(np.uint8).reshape(-1, 1), axis=1)[:, -mod_order:]
-rec_im_bin = rec_syms_cons.flatten()[:len(im_bin)]
+rec_syms = (X_hat.real >= 0).astype(np.uint8)  # 1 nếu >= 0, ngược lại là 0
+rec_im_bin = rec_syms[:len(im_bin)]  # Lấy lại dữ liệu gốc
 ber = np.sum(rec_im_bin != im_bin) / len(im_bin)
 
 # Recover image
@@ -148,5 +123,5 @@ plt.imshow(rec_im, cmap='gray')
 plt.title(f'Recovered Image\nBER: {ber:.2g}')
 
 plt.tight_layout()
-plt.savefig('rusult.png')
+plt.savefig('result2_bpsk.png')
 plt.show()
