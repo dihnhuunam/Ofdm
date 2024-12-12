@@ -8,10 +8,11 @@ from skimage.util import img_as_ubyte
 
 # Simulation parameters
 mod_method = 'QPSK'
+ch_est_method = 'MMSE'
 n_fft = 64
 n_cpe = 16
-snr = 20
-n_taps = 8
+snr = 30
+n_taps = 4
 ch_est_method = 'LS'
 
 # Modulation methods
@@ -19,7 +20,7 @@ mod_methods = {'BPSK': 1, 'QPSK': 2, '8PSK': 3, '16QAM': 4, '32QAM': 5, '64QAM':
 mod_order = mod_methods[mod_method]
 
 # Load and process image
-im = imread('image.jpg', as_gray=True)  # Read image as grayscale
+im = imread('image2.jpg', as_gray=True)  # Read image as grayscale
 im = img_as_ubyte(im)
 im_bin = ''.join(format(byte, '08b') for byte in im.ravel())
 
@@ -29,7 +30,8 @@ im_bin_padded = im_bin + '0' * sym_rem
 if mod_order == 1:  # Special case for BPSK
     symbols = [int(bit) for bit in im_bin_padded]
 else:
-    symbols = [int(im_bin_padded[i:i+mod_order], 2) for i in range(0, len(im_bin_padded), mod_order)]
+    symbols = [int(im_bin_padded[i:i+mod_order], 2) 
+               for i in range(0, len(im_bin_padded), mod_order) ]
     
 # # Define symbol book
 # if mod_order == 1:  # BPSK
@@ -57,8 +59,9 @@ else:
 # Define symbol book for QPSK
 if mod_order == 2:  # QPSK
     mod_ind = 2 ** mod_order  # 4 symbols
-    angles = np.linspace(0, 2 * np.pi, mod_ind, endpoint=False) + np.pi / 4
-    symbol_book = np.cos(angles) + 1j * np.sin(angles)
+    angles = np.linspace(0, 2 * np.pi, 2 ** mod_order, endpoint=False) + np.pi / 4
+    symbol_book = np.cos(angles) + 1j * np.sin(angles)  # Chòm sao QPSK
+
 
 # Verify symbols and symbol book match
 assert max(symbols) < len(symbol_book), "Symbol index out of range for symbol book"
@@ -90,14 +93,24 @@ x_p = x_s_noise_fading.reshape(-1, n_fft + n_cpe)
 x_p_cpr = x_p[:, n_cpe:]
 X_hat_blocks = np.fft.fft(x_p_cpr, axis=1)
 
-# Channel estimation
-if n_taps > 1 and ch_est_method == 'LS':
-    G = X_hat_blocks[:, 0] / X_blocks[:, 0]
-    X_hat_blocks /= G[:, None]
+# Channel estimation MMSE
+# if n_taps > 1 and ch_est_method == 'LS':
+#     G = X_hat_blocks[:, 0] / X_blocks[:, 0]
+#     X_hat_blocks /= G[:, None]
+
+R_n = noise_pwr * np.eye(n_fft)
+H = np.fft.fft(np.hstack([g, np.zeros(n_fft - n_taps)]))  # Kênh trong miền tần số
+H_diag = np.diag(H)  # Tạo ma trận chéo
+H_MMSE = np.linalg.inv(H_diag.conj().T @ H_diag + R_n) @ H_diag.conj().T
+X_hat_blocks = H_MMSE @ X_hat_blocks.T
+X_hat_blocks = X_hat_blocks.T
+
+
 
 # Demodulation
 X_hat = X_hat_blocks.ravel()[:len(X)]
-rec_syms = np.array([np.argmin(distance.cdist([[z.real, z.imag]], np.c_[symbol_book.real, symbol_book.imag])) for z in X_hat])
+#rec_syms = np.array([np.argmin(distance.cdist([[z.real, z.imag]], np.c_[symbol_book.real, symbol_book.imag])) for z in X_hat])
+rec_syms = [np.argmin(np.abs(symbol_book - z)) for z in X_hat]
 
 # Convert symbols back to binary
 rec_bin = ''.join(format(s, f'0{mod_order}b') for s in rec_syms)
@@ -108,7 +121,9 @@ bit_errors = sum(a != b for a, b in zip(im_bin, rec_bin))
 ber = bit_errors / len(im_bin)
 
 # Recover image
-rec_im = np.array([int(rec_bin[i:i+8], 2) for i in range(0, len(rec_bin), 8)], dtype=np.uint8).reshape(im.shape)
+rec_bin = rec_bin[:len(im_bin)]  # Đảm bảo đúng kích thước gốc
+rec_im = np.array([int(rec_bin[i:i+8], 2) for i in range(0, len(rec_bin), 8)], dtype=np.uint8)
+rec_im = rec_im.reshape(im.shape)
 
 # Plot results
 plt.figure(figsize=(10, 10))
@@ -135,5 +150,5 @@ plt.imshow(rec_im, cmap='gray')
 plt.title(f"Recovered Image (BER: {ber:.2g})")
 
 plt.tight_layout()
-plt.savefig('Result.png')
+plt.savefig('Result3.png')
 plt.show()

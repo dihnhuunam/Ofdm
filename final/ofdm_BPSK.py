@@ -5,9 +5,9 @@ from skimage.io import imread
 
 # Parameters
 mod_method = 'BPSK'
-n_fft = 128
+n_fft = 64
 n_cpe = 16
-snr = 30  # in dB
+snr = 0  # in dB
 n_taps = 8
 ch_est_method = 'MMSE'
 
@@ -16,7 +16,7 @@ mod_order = 1  # BPSK chỉ sử dụng 1 bit trên mỗi ký hiệu
 symbol_book = np.array([-1, 1], dtype=np.complex64)  # Sách ký hiệu BPSK
 
 # Load image
-im = imread('image2.png')
+im = imread('VN.png')
 
 if im.shape[-1] == 4:
     im = im[:, :, :3]
