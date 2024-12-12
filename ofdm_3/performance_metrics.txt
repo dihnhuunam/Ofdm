@@ -1,3 +1,0 @@
-BER: 0.498264
-SNR: 20.00 dB
-Symbol Error Rate: 0.996528
