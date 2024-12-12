@@ -2,146 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fft import fft, ifft
 from scipy.signal import convolve
-
-# Channel Model Functions
-def mcm_channel_model(u, initial_time, number_of_summations, symbol_duration, f_dmax, channel_coefficients):
-    """
-    Implements Monte Carlo Multipath (MCM) channel model simulation.
-    
-    Parameters:
-    - u: Random variables for channel realization
-    - initial_time: Starting time of the symbol
-    - number_of_summations: Number of summation terms for channel modeling
-    - symbol_duration: Duration of each symbol
-    - f_dmax: Maximum Doppler frequency
-    - channel_coefficients: Predefined channel tap gains
-    
-    Returns:
-    - h: Channel impulse response
-    - t_next: Next time step
-    """
-    t = initial_time
-    Channel_Length = len(channel_coefficients)
-    h_vector = []
-
-    for k in range(Channel_Length):
-        u_k = u[k, :]
-        phi = 2 * np.pi * u_k
-        f_d = f_dmax * np.sin(2 * np.pi * u_k)
-        # Calculate channel tap using stochastic model
-        h_tem = channel_coefficients[k] * 1 / np.sqrt(number_of_summations) * np.sum(np.exp(1j * phi) * np.exp(1j * 2 * np.pi * f_d * t))
-        h_vector.append(h_tem)
-
-    h = np.array(h_vector)
-    t_next = initial_time + symbol_duration
-    return h, t_next
-
-def ofdm_modulator(data, NFFT, G):
-    """
-    Modulates input data into an OFDM signal.
-    
-    Parameters:
-    - data: Input data symbols
-    - NFFT: Fast Fourier Transform size
-    - G: Guard interval size
-    
-    Returns:
-    - OFDM modulated time-domain signal
-    """
-    chnr = len(data)
-    # Zero-pad the data to NFFT size
-    x = np.concatenate([data, np.zeros(NFFT - chnr)])
-    # Convert to time domain using IFFT
-    a = ifft(x)
-    # Add cyclic prefix (guard interval)
-    y = np.concatenate([a[-G:], a])
-    return y
-
-def ofdm_demodulator(data, chnr, NFFT, G):
-    """
-    Demodulates OFDM signal back to data symbols.
-    
-    Parameters:
-    - data: OFDM modulated signal
-    - chnr: Number of data symbols
-    - NFFT: FFT size
-    - G: Guard interval size
-    
-    Returns:
-    - Demodulated data symbols in frequency domain
-    """
-    # Remove guard interval
-    x_remove_guard_interval = data[G:NFFT + G]
-    # Convert back to frequency domain
-    x = fft(x_remove_guard_interval)
-    # Extract original data symbols
-    y = x[:chnr]
-    return y
-
-def qam_modulator(data, M):
-    """
-    Modulates data symbols using Quadrature Amplitude Modulation (QAM).
-    
-    Parameters:
-    - data: Input data symbols
-    - M: QAM modulation order (constellation size)
-    
-    Returns:
-    - QAM modulated complex symbols
-    """
-    return np.sqrt(1 / 10) * np.exp(1j * (np.pi / M) * (2 * data + 1))
-
-def qam_demodulator(symbols, M):
-    """
-    Demodulates QAM symbols back to original data symbols.
-    
-    Parameters:
-    - symbols: QAM modulated complex symbols
-    - M: QAM modulation order
-    
-    Returns:
-    - Demodulated integer data symbols
-    """
-    # Decode symbols using angle and QAM constellation mapping
-    demod_data = (np.angle(symbols) / (np.pi / M) - 1) / 2
-    return np.round(demod_data).astype(int) % M
-
-def symerr(a, b):
-    """
-    Calculates symbol error rate (SER) and number of errors.
-    
-    Parameters:
-    - a: Original data symbols
-    - b: Decoded data symbols
-    
-    Returns:
-    - Number of symbol errors
-    - Symbol error rate
-    """
-    num_errors = np.sum(a != b)
-    error_rate = num_errors / len(a)
-    return num_errors, error_rate
-
-def awgn(s, snr_dB):
-    """
-    Adds Additive White Gaussian Noise (AWGN) to the signal.
-    
-    Parameters:
-    - s: Input signal
-    - snr_dB: Signal-to-Noise Ratio in decibels
-    
-    Returns:
-    - Noisy signal with AWGN added
-    """
-    # Convert SNR from dB to linear scale
-    snr_linear = 10**(snr_dB / 10)
-    # Calculate signal power
-    power_signal = np.mean(np.abs(s)**2)
-    # Calculate noise variance
-    noise_variance = power_signal / snr_linear
-    # Generate complex Gaussian noise
-    noise = np.sqrt(noise_variance / 2) * (np.random.randn(*s.shape) + 1j * np.random.randn(*s.shape))
-    return s + noise
+import ofdm_demodulator
+import ofdm_modulator
+import qam_demodulator
+import qam_modulator
+import awgn
+import mcm_channel_model
+import symerr
 
 # Rest of the code remains the same as in the original script
 # ... [The rest of the implementation follows]
@@ -166,7 +33,7 @@ length_data = NofOFDMSymbol * NFFT
 source_data = np.random.randint(0, M_ary, length_data)
 
 # QAM modulation
-qam_symbols = qam_modulator(source_data, M_ary)
+qam_symbols = qam_modulator.qam_modulator(source_data, M_ary)
 
 # Arrange QAM symbols into OFDM data pattern
 data_pattern = qam_symbols.reshape((NofOFDMSymbol, NFFT))
@@ -191,11 +58,11 @@ for number_of_realization in range(Number_Relz):
         initial_time = 0
 
         for i in range(NofOFDMSymbol):
-            ofdm_signal = ofdm_modulator(data_pattern[i, :], NFFT, G)
-            h, t = mcm_channel_model(u, initial_time, number_of_summations, symbol_duration, f_dmax, rho)
+            ofdm_signal = ofdm_modulator.ofdm_modulator(data_pattern[i, :], NFFT, G)
+            h, t = mcm_channel_model.mcm_channel_model(u, initial_time, number_of_summations, symbol_duration, f_dmax, rho)
             h_frame.append(h)
             rs = convolve(ofdm_signal, h)[:len(ofdm_signal)]
-            rs = awgn(rs, snt)
+            rs = awgn.awgn(rs, snt)
             rs_frame.append(rs)
             initial_time = t
 
@@ -208,7 +75,7 @@ for number_of_realization in range(Number_Relz):
 
         for i in range(NofOFDMSymbol):
             rs_i = rs_frame[i, :]
-            demodulated_signal_i = ofdm_demodulator(rs_i, NFFT, NFFT, G)
+            demodulated_signal_i = ofdm_demodulator.ofdm_demodulator(rs_i, NFFT, NFFT, G)
             h = h_frame[i, :]
             H = fft(np.concatenate([h, np.zeros(NFFT - N_P)]))
 
@@ -217,12 +84,12 @@ for number_of_realization in range(Number_Relz):
             MMSE = np.conj(H) / (np.abs(H)**2 + noise_power)
             d = demodulated_signal_i * MMSE
 
-            demodulated_symbol_i = qam_demodulator(d, M_ary)
+            demodulated_symbol_i = qam_demodulator.qam_demodulator(d, M_ary)
             data_symbol.extend(demodulated_symbol_i)
 
         data_symbol = np.array(data_symbol)
 
-        num_errors, error_rate = symerr(source_data, data_symbol)
+        num_errors, error_rate = symerr.symerr(source_data, data_symbol)
         ser.append(error_rate)
 
     ser_relz.append(ser)
