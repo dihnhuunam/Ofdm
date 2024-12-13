@@ -54,7 +54,7 @@ mod_methods = ['BPSK', 'QPSK', '8PSK', '16QAM', '32QAM', '64QAM']
 mod_order = mod_methods.index(mod_method) + 1
 
 # Load and preprocess image
-im = imread('./images/image.png')
+im = imread('./images/images.jpg')
 if im.shape[-1] == 4:  # Handle alpha channel
     im = im[:, :, :3]
 
